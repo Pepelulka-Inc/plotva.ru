@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS plotva.product_category (
 );
 
 CREATE TABLE IF NOT EXISTS plotva.product (
-    product_id UUID PRIMARY KEY,
+    product_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     seller_id UUID NOT NULL,
