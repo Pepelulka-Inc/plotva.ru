@@ -20,7 +20,7 @@ type ProductCategoryRepoPg struct {
 
 func (repo ProductCategoryRepoPg) GetAll(ctx context.Context) ([]models.ProductCategory, error) {
 	queryString := `
-SELECT category_name FROM plotva.product_category ORDER BY category_name;
+SELECT category_name FROM plotva.product_categories ORDER BY category_name;
 	`
 	conn, err := repo.Pool.Acquire(ctx)
 	if err != nil {
@@ -42,7 +42,7 @@ SELECT category_name FROM plotva.product_category ORDER BY category_name;
 
 func (repo ProductCategoryRepoPg) Add(ctx context.Context, cat models.ProductCategory) error {
 	queryString := `
-INSERT INTO plotva.product_category (category_name) VALUES ($1);
+INSERT INTO plotva.product_categories (category_name) VALUES ($1);
 	`
 	if err := cat.Validate(); err != nil {
 		return err
@@ -60,7 +60,7 @@ INSERT INTO plotva.product_category (category_name) VALUES ($1);
 
 func (repo ProductCategoryRepoPg) DeleteByName(ctx context.Context, name string) error {
 	queryString := `
-DELETE FROM plotva.product_category WHERE category_name = $1;
+DELETE FROM plotva.product_categories WHERE category_name = $1;
 	`
 	conn, err := repo.Pool.Acquire(ctx)
 	if err != nil {

@@ -85,7 +85,7 @@ def gen_and_dump_sellers() -> List[uuid.UUID]:
 
 
 async def load_categories_in_pg(conn, categories: List[str]):
-    query_str = "INSERT INTO plotva.product_category (category_name) VALUES "
+    query_str = "INSERT INTO plotva.product_categories (category_name) VALUES "
     for i in range(len(categories)):
         query_str += f"(${i + 1})"
         if i != len(categories) - 1:
@@ -98,7 +98,7 @@ async def load_categories_in_pg(conn, categories: List[str]):
 async def load_products_in_pg(conn, products_list: List[Product]):
     query_str = """
 INSERT INTO
-    plotva.product (product_id, name, description, seller_id, category, photo_url, price_rub, creation_time)
+    plotva.products (product_id, name, description, seller_id, category, photo_url, price_rub, creation_time)
 VALUES
     ($1, $2, $3, $4, $5, $6, $7, $8);
     """

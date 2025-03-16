@@ -31,7 +31,7 @@ func (repo ProductRepoPg) GetById(ctx context.Context, product_id uuid.UUID) (mo
 SELECT 
 	product_id, name, description, seller_id, category, photo_url, price_rub, creation_time
 FROM
-	plotva.product
+	plotva.products
 WHERE product_id = $1;
 	`
 
@@ -59,7 +59,7 @@ WHERE product_id = $1;
 func (repo ProductRepoPg) DeleteById(ctx context.Context, product_id uuid.UUID) error {
 	queryString := `
 DELETE FROM 
-	plotva.product
+	plotva.products
 WHERE product_id = $1;
 	`
 
@@ -76,7 +76,7 @@ WHERE product_id = $1;
 func (repo ProductRepoPg) Add(ctx context.Context, product models.ProductCreate) (uuid.UUID, error) {
 	queryString := `
 INSERT INTO
-	plotva.product (name, description, seller_id, category, photo_url, price_rub, creation_time)
+	plotva.products (name, description, seller_id, category, photo_url, price_rub, creation_time)
 VALUES
 	($1, $2, $3, $4, $5, $6, NOW())
 RETURNING product_id;
@@ -110,7 +110,7 @@ func buildQueryForFilter(filter models.ProductFilter) (string, []any) {
 SELECT
 	product_id, name, description, seller_id, category, photo_url, price_rub, creation_time
 FROM
-	plotva.product
+	plotva.products
 	`)
 
 	whereBuilder := db.NewWhereStatementBuilder(0)
