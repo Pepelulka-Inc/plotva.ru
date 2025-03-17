@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS plotva.products (
     category VARCHAR REFERENCES plotva.product_categories (category_name),
     photo_url VARCHAR(255) NOT NULL,
     price_rub BIGINT NOT NULL,
-    creation_time TIMESTAMP NOT NULL
+    price_last_updated TIMESTAMP NOT NULL DEFAULT NOW(),
+    creation_time TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_products_name ON plotva.products (name);
@@ -30,7 +31,7 @@ CREATE TABLE IF NOT EXISTS plotva.comments (
     user_id UUID NOT NULL,
     content TEXT,
     rating SMALLINT NOT NULL,
-    time TIMESTAMP
+    time TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_comments_product_id ON plotva.comments (product_id);
