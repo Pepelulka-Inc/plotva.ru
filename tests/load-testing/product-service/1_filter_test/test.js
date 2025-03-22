@@ -16,7 +16,7 @@ export let options = {
     ],
     thresholds: {
         http_req_duration: ['p(95)<500'], // 95% запросов должны быть быстрее 500 мс
-        http_reqs: ['rate>100'], // Минимальный RPS
+        http_reqs: ['rate>100'],          // Минимальный RPS
     },
 };
 
