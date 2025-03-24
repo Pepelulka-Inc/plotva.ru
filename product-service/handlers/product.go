@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"product-service/models"
 	"product-service/repo"
@@ -11,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	hu "plotva.ru/common/handlers_utils"
+	jt "plotva.ru/common/json_types"
+	"plotva.ru/common/kafka"
 )
 
 // POST /api/product/add
@@ -110,7 +113,56 @@ func PostGetProductsByFilter(repo repo.ProductRepo, c echo.Context) error {
 	c.Bind(&filter)
 
 	result, err := repo.GetByFilter(ctx, filter)
-	time.Sleep(100 * time.Millisecond)
+	if err != nil {
+		return c.JSON(500, hu.Error(err))
+	}
+	return c.JSON(200, result)
+}
+
+// GET /api/product/view/:user_id/:id
+//
+// Response json:
+// - status == 200: models.Product
+// - statis != 200: hu.BasicResponse
+//
+// Делает абсолютно тоже самое что GetProductById, но еще и отправляет сообщение в кафку о просмотре.
+// TODO: Надо брать user_id из авторизации
+func GetViewProduct(repo repo.ProductRepo, producer *kafka.KafkaProducer, c echo.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	defer cancel()
+
+	userIdStr := c.Param("user_id")
+	userId, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return c.JSON(400, hu.Error(
+			fmt.Errorf(
+				"error while parsing user_id: %s",
+				err.Error(),
+			),
+		))
+	}
+
+	productIdStr := c.Param("id")
+	productId, err := uuid.Parse(productIdStr)
+	if err != nil {
+		return c.JSON(400, fmt.Errorf(
+			"error while parsing product_id: %s",
+			err.Error(),
+		))
+	}
+
+	// Если не получилось отправить сообщение, сообщим об этом, но все равно ответим на запрос
+	err = producer.SendJSON(kafka.KafkaProductViewsTopicName, models.ProductViewMessage{
+		UserId:    jt.JsonUUID(userId),
+		ProductId: jt.JsonUUID(productId),
+		Timestamp: time.Now(),
+	})
+	if err != nil {
+		log.Printf("can't send messages to kafka: %s", err)
+	}
+
+	result, err := repo.GetById(ctx, productId)
+
 	if err != nil {
 		return c.JSON(500, hu.Error(err))
 	}

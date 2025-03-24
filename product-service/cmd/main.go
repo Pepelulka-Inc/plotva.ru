@@ -16,6 +16,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"plotva.ru/common/cfg"
 	"plotva.ru/common/db"
+	"plotva.ru/common/kafka"
 )
 
 func failOnError(err error) {
@@ -51,7 +52,7 @@ func setupProductCategoriesHandlers(e *echo.Echo, pool *pgxpool.Pool) {
 	)
 }
 
-func setupProductHandlers(e *echo.Echo, pool *pgxpool.Pool) {
+func setupProductHandlers(e *echo.Echo, pool *pgxpool.Pool, producer *kafka.KafkaProducer) {
 	productRepo := repo.ProductRepoPg{Pool: pool}
 
 	e.POST(
@@ -77,6 +78,13 @@ func setupProductHandlers(e *echo.Echo, pool *pgxpool.Pool) {
 		},
 	)
 
+	e.GET(
+		"/api/product/view/:user_id/:id",
+		func(c echo.Context) error {
+			return handlers.GetViewProduct(productRepo, producer, c)
+		},
+	)
+
 	e.DELETE(
 		"/api/product/delete/:id",
 		func(c echo.Context) error {
@@ -85,9 +93,9 @@ func setupProductHandlers(e *echo.Echo, pool *pgxpool.Pool) {
 	)
 }
 
-func setupHandlers(e *echo.Echo, pool *pgxpool.Pool) {
+func setupHandlers(e *echo.Echo, pool *pgxpool.Pool, producer *kafka.KafkaProducer) {
 	setupProductCategoriesHandlers(e, pool)
-	setupProductHandlers(e, pool)
+	setupProductHandlers(e, pool, producer)
 }
 
 func main() {
@@ -104,6 +112,8 @@ func main() {
 	failOnError(err)
 	serviceConfig, err := cfg.InterpretAsStructure[internal.ProductServiceConfig](config["product-service"])
 	failOnError(err)
+	kafkaConfig, err := cfg.InterpretAsStructure[kafka.KafkaConfig](config["kafka"])
+	failOnError(err)
 	port := serviceConfig.Port
 
 	// Create db connection pool
@@ -116,10 +126,15 @@ func main() {
 	failOnError(err)
 	defer pool.Close()
 
+	// Kafka producer
+	kafkaProducer, err := kafka.NewProducer(kafkaConfig)
+	failOnError(err)
+	defer kafkaProducer.Close()
+
 	// Set up handlers
 	e := echo.New()
 
-	setupHandlers(e, pool)
+	setupHandlers(e, pool, kafkaProducer)
 
 	if err := e.Start(":" + port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)

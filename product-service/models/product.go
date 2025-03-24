@@ -7,14 +7,15 @@ import (
 )
 
 type Product struct {
-	ProductID    jt.JsonUUID `json:"product_id"`
-	Name         string      `json:"name"`
-	Description  string      `json:"description"`
-	SellerID     jt.JsonUUID `json:"seller_id"`
-	Category     string      `json:"category"`
-	PhotoURL     string      `json:"photo_url"`
-	PriceRub     int         `json:"price_rub"`
-	CreationTime time.Time   `json:"creation_time"`
+	ProductID        jt.JsonUUID `json:"product_id"`
+	Name             string      `json:"name"`
+	Description      string      `json:"description"`
+	SellerID         jt.JsonUUID `json:"seller_id"`
+	Category         string      `json:"category"`
+	PhotoURL         string      `json:"photo_url"`
+	PriceRub         int         `json:"price_rub"`
+	PriceLastUpdated time.Time   `json:"price_last_updated"`
+	CreationTime     time.Time   `json:"creation_time"`
 }
 
 type ProductCreate struct {
@@ -36,4 +37,10 @@ type ProductFilter struct {
 	SellersIDList   []jt.JsonUUID `json:"sellers_id_list,omitempty"`
 	MinCreationTime *time.Time    `json:"min_creation_time,omitempty"`
 	MaxCreationTime *time.Time    `json:"max_creation_time,omitempty"`
+}
+
+type ProductViewMessage struct {
+	UserId    jt.JsonUUID `json:"user_id"`
+	ProductId jt.JsonUUID `json:"product_id"`
+	Timestamp time.Time   `json:"timestamp"`
 }
