@@ -16,6 +16,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"plotva.ru/common/cfg"
 	"plotva.ru/common/db"
+	hu "plotva.ru/common/handlers_utils"
 	"plotva.ru/common/kafka"
 )
 
@@ -26,7 +27,7 @@ func failOnError(err error) {
 }
 
 // TODO: Валидация для /api/product/category/add
-func setupProductCategoriesHandlers(e *echo.Echo, pool *pgxpool.Pool) {
+func setupProductCategoriesHandlers(e *echo.Echo, pool db.SqlConnectionPool) {
 	catRepo := repo.ProductCategoryRepoPg{Pool: pool}
 
 	e.GET(
@@ -41,7 +42,7 @@ func setupProductCategoriesHandlers(e *echo.Echo, pool *pgxpool.Pool) {
 		func(c echo.Context) error {
 			return handlers.PostAddProductCategory(catRepo, c)
 		},
-		internal.ExpectJSONMiddleware,
+		hu.ExpectJSONMiddleware,
 	)
 
 	e.DELETE(
@@ -60,7 +61,7 @@ func setupProductHandlers(e *echo.Echo, pool *pgxpool.Pool, producer *kafka.Kafk
 		func(c echo.Context) error {
 			return handlers.PostAddProduct(productRepo, c)
 		},
-		internal.ExpectJSONMiddleware,
+		hu.ExpectJSONMiddleware,
 	)
 
 	e.POST(
@@ -68,7 +69,7 @@ func setupProductHandlers(e *echo.Echo, pool *pgxpool.Pool, producer *kafka.Kafk
 		func(c echo.Context) error {
 			return handlers.PostGetProductsByFilter(productRepo, c)
 		},
-		internal.ExpectJSONMiddleware,
+		hu.ExpectJSONMiddleware,
 	)
 
 	e.GET(
@@ -117,7 +118,7 @@ func main() {
 	port := serviceConfig.Port
 
 	// Create db connection pool
-	pool, err := db.CreatePool(
+	pool, err := db.CreatePgxPool(
 		context.TODO(),
 		dbConfig,
 		serviceConfig.DbMinConns,

@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ProductRepo interface {
@@ -23,7 +22,7 @@ type ProductRepo interface {
 }
 
 type ProductRepoPg struct {
-	Pool *pgxpool.Pool
+	Pool db.SqlConnectionPool
 }
 
 func (repo ProductRepoPg) GetById(ctx context.Context, product_id uuid.UUID) (models.Product, error) {

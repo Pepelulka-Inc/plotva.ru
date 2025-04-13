@@ -6,9 +6,26 @@
 db:
   host: localhost
   port: 5432
-  user: ...
-  password: ...
-  db_name: ...
+  user: pepe
+  password: pepe
+  db_name: pepe
+
+auth-service:
+  db_min_conns: 2
+  db_max_conns: 10
+  port: 8081
+  oauth:
+    client_id: pepe
+    client_secret: pepe
+    redirect_url: "http://localhost:8081/api/user/login/callback"
+    scopes:
+      - "login:default_phone"
+    auth_url_endpoint: "https://oauth.yandex.ru/authorize"
+    token_url_endpoint: "https://oauth.yandex.ru/token"
+    
+jwt:
+  secret: abcdef
+
 clickhouse:
   host: localhost
   port: 9000

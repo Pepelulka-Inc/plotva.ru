@@ -15,6 +15,11 @@ type PostgresConfig struct {
 	DbName   string `yaml:"db_name"`
 }
 
+type SqlConnectionPool interface {
+	Acquire(context.Context) (*pgxpool.Conn, error)
+	Close()
+}
+
 func GetPostgresUrl(cfg PostgresConfig) string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s",
@@ -26,7 +31,7 @@ func GetPostgresUrl(cfg PostgresConfig) string {
 	)
 }
 
-func CreatePool(ctx context.Context, cfg PostgresConfig, minConns, maxConns int) (*pgxpool.Pool, error) {
+func CreatePgxPool(ctx context.Context, cfg PostgresConfig, minConns, maxConns int) (*pgxpool.Pool, error) {
 	connString := GetPostgresUrl(cfg)
 	poolConfig, err := pgxpool.ParseConfig(connString)
 	if err != nil {

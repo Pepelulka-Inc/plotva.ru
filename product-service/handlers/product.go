@@ -29,7 +29,7 @@ import (
 //
 //   - Expect json
 func PostAddProduct(repo repo.ProductRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	var product models.ProductCreate
@@ -58,7 +58,7 @@ func PostAddProduct(repo repo.ProductRepo, c echo.Context) error {
 //   - status_code == 200: models.Product
 //   - statuc_code != 200: hu.BasicResponse
 func GetProductById(repo repo.ProductRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	idStr := c.Param("id")
@@ -79,7 +79,7 @@ func GetProductById(repo repo.ProductRepo, c echo.Context) error {
 //
 // Response json: hu.BasicResponse
 func DeleteProductById(repo repo.ProductRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	idStr := c.Param("id")
@@ -106,7 +106,7 @@ func DeleteProductById(repo repo.ProductRepo, c echo.Context) error {
 // Middlewares:
 // - Expect json
 func PostGetProductsByFilter(repo repo.ProductRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	var filter models.ProductFilter
@@ -128,7 +128,7 @@ func PostGetProductsByFilter(repo repo.ProductRepo, c echo.Context) error {
 // Делает абсолютно тоже самое что GetProductById, но еще и отправляет сообщение в кафку о просмотре.
 // TODO: Надо брать user_id из авторизации
 func GetViewProduct(repo repo.ProductRepo, producer *kafka.KafkaProducer, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	userIdStr := c.Param("user_id")

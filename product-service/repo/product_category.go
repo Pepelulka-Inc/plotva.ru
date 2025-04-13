@@ -5,7 +5,7 @@ import (
 	"product-service/models"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"plotva.ru/common/db"
 )
 
 type ProductCategoryRepo interface {
@@ -15,7 +15,7 @@ type ProductCategoryRepo interface {
 }
 
 type ProductCategoryRepoPg struct {
-	Pool *pgxpool.Pool
+	Pool db.SqlConnectionPool
 }
 
 func (repo ProductCategoryRepoPg) GetAll(ctx context.Context) ([]models.ProductCategory, error) {

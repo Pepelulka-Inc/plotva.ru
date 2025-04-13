@@ -18,7 +18,7 @@ func Test(c echo.Context) error {
 
 // GET: /api/product/category/all
 func GetAllProductCategories(catRepo repo.ProductCategoryRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	cats, err := catRepo.GetAll(ctx)
@@ -31,7 +31,7 @@ func GetAllProductCategories(catRepo repo.ProductCategoryRepo, c echo.Context) e
 
 // POST: /api/product/category/add
 func PostAddProductCategory(catRepo repo.ProductCategoryRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	var cat models.ProductCategory
@@ -50,7 +50,7 @@ func PostAddProductCategory(catRepo repo.ProductCategoryRepo, c echo.Context) er
 
 // DELETE: /api/product/category/delete/:name
 func DeleteProductCategory(catRepo repo.ProductCategoryRepo, c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ENDPOINT_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), EndpointTimeout)
 	defer cancel()
 
 	name := c.Param("name")
