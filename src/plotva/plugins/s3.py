@@ -25,6 +25,20 @@ from src.plotva.common.filestorage import (
 )
 
 
+__all__ = [
+    "plugin_init",
+    "CephIOFileNotFoundException",
+    "CephAdapter",
+    "CephAdapterProvider",
+    "CephIO",
+    "CephFile",
+    "get_last_modified_to_datetime",
+    "CephStorage",
+    "CephStorageProvider",
+    "BucketSnapshot",
+]
+
+
 _logger = getLogger(__name__)
 
 
@@ -151,6 +165,9 @@ class CephFile(IFile):
 
     def open(self, mode="r", *args, **kwargs):
         return CephIO(bucket=self._bucket, filename=str(self._path), mode=mode)
+
+    def get_universal_name_path(self) -> UniversalNamePath:
+        return UniversalNamePath(value=str(self._path))
 
 
 class CephAdapter(IFileStorageAdapter):
