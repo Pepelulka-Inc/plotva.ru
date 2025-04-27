@@ -92,11 +92,6 @@ def get_diff(old_files: Dict[str, int], new_files: Dict[str, int]) -> Diff:
     return diff
 
 
-"""
-Если у нас файлы будут храниться только в сефе, то уберем
-"""
-
-
 class IFileStorageAdapterProvider(metaclass=ABCMeta):
     @abstractmethod
     def get_adapter(self) -> IFileStorageAdapter:
