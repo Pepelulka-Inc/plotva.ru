@@ -2,6 +2,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel as PydanticBaseModel, Field
 from datetime import datetime, timedelta
+from models import OrderStatus
 
 class BaseRequest(PydanticBaseModel):
     user_id: str = Field(
@@ -31,6 +32,14 @@ class CreateOrderResponse(BaseResponse):
 
 class OrderResponse(BaseResponse):
     order_data: Optional[Union[dict, List[dict]]] = None
+
+class SetStatusRequest(BaseRequest):
+    order_id: UUID
+    new_status: OrderStatus
+
+class UpdateStatusResponse(BaseResponse):
+    status: Optional[str] = None
+    updated_order_id: Optional[UUID] = None
 
 
 

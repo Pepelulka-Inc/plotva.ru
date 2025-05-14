@@ -2,11 +2,14 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import get_db_session
-from sqlalchemy import select
+from sqlalchemy import exists, select, update
 from schemas import api
 from schemas import repositories
 from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, NoResultFound, IntegrityError
+from logging import getLogger
+
+logger = getLogger()
 
 api_router = APIRouter(prefix="/api", tags=["order_service_api"])
 
@@ -93,6 +96,81 @@ async def get_order_details(
     except Exception as e:
         return api.OrderResponse(
             error_message=f"Unexpected error: {str(e)}"
+        )
+
+@api_router.post('/orders/{order_id}/status')
+async def update_order_status(
+    order_id: uuid.UUID,
+    data: api.SetStatusRequest,
+    session: AsyncSession = Depends(get_db_session)
+):
+    try:
+        # Проверяем существование заказа
+        order_exists = await session.execute(
+            select(exists().where(repositories.OrdersModel.order_id == order_id))
+        )
+        if not order_exists.scalar():
+            return api.sta(
+                error_message=f"Заказ с ID {order_id} не найден",
+                status=None,
+                updated_order_id=None
+            )
+
+        # Обновляем статус
+        await session.execute(
+            update(repositories.OrdersModel)
+            .where(repositories.OrdersModel.order_id == order_id)
+            .values(status=data.new_status.value)
+        )
+        await session.commit()
+
+        return api.UpdateStatusResponse(
+            status="success",
+            updated_order_id=order_id,
+            error_message=None
+        )
+
+    except ValueError as e:
+        await session.rollback()
+        return api.UpdateStatusResponse(
+            error_message=f"Некорректный статус: {str(e)}",
+            status="error",
+            updated_order_id=None
+        )
+
+    except NoResultFound:
+        await session.rollback()
+        return api.UpdateStatusResponse(
+            error_message=f"Заказ с ID {order_id} не найден",
+            status="error",
+            updated_order_id=None
+        )
+
+    except IntegrityError as e:
+        await session.rollback()
+        logger.error(f"Integrity error updating order {order_id}: {str(e)}")
+        return api.UpdateStatusResponse(
+            error_message="Ошибка целостности данных",
+            status="error",
+            updated_order_id=None
+        )
+
+    except SQLAlchemyError as e:
+        await session.rollback()
+        logger.error(f"Database error updating order {order_id}: {str(e)}")
+        return api.UpdateStatusResponse(
+            error_message="Ошибка базы данных",
+            status="error",
+            updated_order_id=None
+        )
+
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Unexpected error updating order {order_id}: {str(e)}")
+        return api.UpdateStatusResponse(
+            error_message="Внутренняя ошибка сервера",
+            status="error",
+            updated_order_id=None
         )
 
 
