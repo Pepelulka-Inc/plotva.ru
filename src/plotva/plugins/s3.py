@@ -340,17 +340,14 @@ def plugin_init(
     secret_key: Optional[str] = None,
 ) -> Any:
     """
-    Плагин для работы с S3 с Ceph в качестве провайдера хранилища. Создает и регистрирует
+    Плагин для работы с S3 и Ceph в качестве провайдера хранилища. Создает и регистрирует
     объект S3Connection и регистрирует классы CephAdapterProvider и CephStorageProvider
-
     :param host: Хост сефа
     :param port: Порт
     :param is_secure: Использование защищенного соединения
     :param access_key: Access-key
     :param secret_key: Secret-key
-
     Пример конфига::
-
         - name: plotva.plugins.s3
           config:
             host: 127.0.0.1
