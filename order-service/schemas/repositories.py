@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List
-from sqlalchemy import ForeignKey, Integer, BigInteger, select, text
+from sqlalchemy import ForeignKey, Integer, BigInteger, delete, select, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from schemas import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,12 @@ from uuid import UUID, uuid4
 from models import OrderStatus
 
 class ProductCategoriesModel(BaseModel):
+    """Модель категорий товаров.
+    
+    Attributes:
+        category_name: Название категории (первичный ключ)
+        products: Список товаров в этой категории (отношение один-ко-многим)
+    """
     __tablename__ = 'product_categories'
     
     category_name: Mapped[str] = mapped_column(primary_key=True, index=True)
@@ -16,6 +22,19 @@ class ProductCategoriesModel(BaseModel):
     )
 
 class ProductsModel(BaseModel):
+    """Модель товаров в магазине.
+    
+    Attributes:
+        product_id: UUID товара (первичный ключ)
+        name: Название товара
+        description: Описание товара
+        seller_id: ID продавца (внешний ключ)
+        category: Категория товара
+        photo_url: URL изображения товара
+        creation_time: Время создания записи
+        price_rub: Цена в рублях
+        price_last_updated: Время последнего обновления цены
+    """
     __tablename__ = 'products'
 
     product_id: Mapped[UUID] = mapped_column(
@@ -51,10 +70,20 @@ class ProductsModel(BaseModel):
     )
 
     async def get_product_name_by_id(
-            self,
-            session: AsyncSession,
+            self, 
+            session: AsyncSession, 
             product_id: str
-    ):
+        ):
+        """
+        Получает название товара по его ID.
+        
+        Args:
+            session: Асинхронная сессия SQLAlchemy
+            product_id: UUID товара для поиска
+            
+        Returns:
+            Список названий товаров (обычно один элемент)
+        """
         name = await session.execute(select(ProductsModel.name).filter(
             product_id=ProductsModel.product_id
         ))
@@ -160,12 +189,13 @@ class ShoppingCartEntriesModel(BaseModel):
     quantity: Mapped[int] = mapped_column(Integer)
 
 class OrdersModel(BaseModel):
+    """Модель заказов в системе."""
     __tablename__ = 'orders'
     
     order_id: Mapped[UUID] = mapped_column(
         primary_key=True, 
-        default=uuid4,  # Добавляем генератор UUID по умолчанию
-        server_default=text("gen_random_uuid()")  # И серверную генерацию
+        default=uuid4, 
+        server_default=text("gen_random_uuid()")
     )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.user_id")
@@ -183,6 +213,95 @@ class OrdersModel(BaseModel):
     )
 
     @classmethod
+    async def get_user_orders(
+        cls, 
+        session: AsyncSession,
+        user_id: UUID
+    ):
+        """
+        Получает все заказы пользователя.
+        
+        Args:
+            session: Асинхронная сессия SQLAlchemy
+            user_id: UUID пользователя
+            
+        Returns:
+            Список заказов в формате словарей
+        """
+        orders = await session.execute(
+            select(OrdersModel)
+            .where(OrdersModel.user_id == user_id)
+            .order_by(OrdersModel.order_date.desc())
+        )
+        orders_list = [order.to_dict() for order in orders.scalars().all()]
+        return orders_list
+    
+    @classmethod
+    async def get_order(
+        cls, 
+        session: AsyncSession, 
+        order_id: str
+    ):
+        """
+        Получает заказ по ID со всеми связанными позициями.
+        
+        Args:
+            session: Асинхронная сессия SQLAlchemy
+            order_id: UUID заказа
+            
+        Returns:
+            Объект OrdersModel или None если не найден
+        """
+        order = await session.execute(
+            select(OrdersModel)
+            .options(selectinload(OrdersModel.entries))
+            .where(OrdersModel.order_id == order_id)
+        )
+        order_obj = order.scalar_one_or_none()
+        return order_obj
+    
+    async def update_status(
+            self, 
+            session: AsyncSession, 
+            status: str
+        ):
+        """
+        Обновляет статус заказа с проверкой допустимых переходов.
+        
+        Args:
+            session: Асинхронная сессия SQLAlchemy
+            status: Новый статус заказа
+        """
+        
+        new_status = OrderStatus(status)
+        
+        self.status = new_status.value
+
+    @classmethod
+    async def delete_order(
+        cls, 
+        session: AsyncSession, 
+        order_id: UUID
+    ):
+        """
+        Удаляет заказ и все его позиции.
+        
+        Args:
+            session: Асинхронная сессия SQLAlchemy
+            order_id: UUID заказа для удаления
+        """
+        await session.execute(
+                delete(OrderEntriesModel)
+                .where(OrderEntriesModel.order_id == order_id)
+            )
+        
+        await session.execute(
+                delete(OrdersModel)
+                .where(OrdersModel.order_id == order_id)
+            )
+    
+
+    @classmethod
     async def create_order(
         cls,
         user_id: UUID,
@@ -193,6 +312,25 @@ class OrdersModel(BaseModel):
         address_id: UUID,
         session: AsyncSession
     ):
+        """
+        Создает новый заказ с указанными товарами.
+        
+        Args:
+            user_id: UUID пользователя
+            product_id_list: Список ID товаров
+            amounts: Количество каждого товара
+            order_time: Время создания заказа
+            shipped_time: Планируемое время доставки
+            address_id: ID адреса доставки
+            session: Асинхронная сессия SQLAlchemy
+            
+        Returns:
+            Созданный объект OrdersModel
+            
+        Raises:
+            ValueError: При несоответствии количества товаров и количеств
+                       Если товары не найдены
+        """
         if len(product_id_list) != len(amounts):
             raise ValueError("Количество товаров и количеств не совпадает")
 
@@ -243,9 +381,61 @@ class OrdersModel(BaseModel):
 
         order.status = OrderStatus.SHIPPED.value
         return order
+    
+    @classmethod
+    async def update_order(
+        cls,
+        session: AsyncSession,
+        order_id: UUID,
+        update_data: dict
+    ):
+        """
+        Обновляет данные заказа.
+        
+        Args:
+            session: Асинхронная сессия SQLAlchemy
+            order_id: UUID заказа
+            update_data: Словарь с полями для обновления
+            
+        Returns:
+            Список обновленных полей
+            
+        Raises:
+            ValueError: Если заказ не найден
+        """
+        order = await cls.get_order(session, order_id)
+        
+        if not order:
+            raise ValueError("Order not found")
+
+        updated_fields = []
+        if 'address_id' in update_data:
+            order.address_id = update_data['address_id']
+            updated_fields.append('address_id')
+        
+        if 'shipped_date' in update_data:
+            order.shipped_date = update_data['shipped_date']
+            updated_fields.append('shipped_date')
+        
+        if 'status' in update_data:
+            await order.update_status(session, update_data['status'])
+            updated_fields.append('status')
+        
+        if 'entries' in update_data:
+            total_cost = sum(
+                entry.product_price_rub * entry.quantity
+                for entry in order.entries
+            )
+            order.total_cost_rub = total_cost
+            updated_fields.append('total_cost_rub')
+
+        session.add(order)
+        await session.commit()
+        return updated_fields
         
 
 class OrderEntriesModel(BaseModel):
+    """Модель позиций заказа. Каждая запись представляет один товар в заказе"""
     __tablename__ = 'order_entries'
     
     entry_id: Mapped[int] = mapped_column(

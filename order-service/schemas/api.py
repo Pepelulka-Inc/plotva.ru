@@ -37,10 +37,57 @@ class SetStatusRequest(BaseRequest):
     order_id: UUID
     new_status: OrderStatus
 
-class UpdateStatusResponse(BaseResponse):
+class SetStatusResponse(BaseResponse):
     status: Optional[str] = None
     updated_order_id: Optional[UUID] = None
 
+class DeleteOrderResponse(BaseResponse):
+    order_id: UUID
 
+class OrderEntryUpdate(PydanticBaseModel):
+    entry_id: UUID = Field(..., description="ID позиции заказа")
+    quantity: Optional[int] = Field(None, gt=0, description="Новое количество")
+    remove: Optional[bool] = Field(False, description="Флаг удаления позиции")
+
+class UpdateOrderRequest(BaseRequest):
+    address_id: Optional[UUID] = Field(
+        None, 
+        description="Новый адрес доставки"
+    )
+    shipped_date: Optional[datetime] = Field(
+        None,
+        description="Новая дата доставки"
+    )
+    status: Optional[OrderStatus] = Field(
+        None,
+        description="Новый статус заказа"
+    )
+    entries: Optional[List[OrderEntryUpdate]] = Field(
+        None,
+        description="Список изменений позиций заказа"
+    )
+    note: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Дополнительная заметка к заказу"
+    )
+
+class UpdatedOrderEntry(PydanticBaseModel):
+    entry_id: UUID
+    product_id: UUID
+    product_name: str
+    quantity: int
+    price_rub: int
+    status: str  # 'updated' | 'removed'
+
+class UpdateOrderResponse(BaseResponse):
+    updated_fields: List[str] = Field(
+        [],
+        description="Список обновленных полей"
+    )
+    new_status: Optional[OrderStatus] = Field(
+        None,
+        description="Актуальный статус заказа после обновления"
+    )
 
     
