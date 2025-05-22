@@ -1,6 +1,9 @@
 import asyncio
+from asyncio import AbstractEventLoop
+from functools import partial
 import io
 import os
+import urllib3
 import fnmatch
 from datetime import timezone, datetime
 from logging import getLogger
@@ -8,13 +11,9 @@ from pathlib import PurePath
 from typing import Iterable, Dict, Any, IO, AnyStr, Optional, Iterator, List, Set, Type
 
 from attr import attrib, dataclass
-from boto.s3.key import Key
-from boto.s3.bucket import Bucket
-from boto.s3.connection import S3Connection, OrdinaryCallingFormat
-from boto.s3.bucketlistresultset import BucketListResultSet
-from boto.exception import S3ResponseError
-from boto import connect_s3
-
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from src.plotva.common.filestorage import (
     IFile,
     IFileStorageAdapter,
@@ -24,43 +23,33 @@ from src.plotva.common.filestorage import (
     IFileStorageAdapterProvider,
 )
 
-
 __all__ = [
     "plugin_init",
     "CephIOFileNotFoundException",
     "CephAdapter",
     "CephAdapterProvider",
-    "CephIO",
-    "CephFile",
-    "get_last_modified_to_datetime",
     "CephStorage",
     "CephStorageProvider",
     "BucketSnapshot",
 ]
 
-
 _logger = getLogger(__name__)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
-def _modified(key: Key) -> int:
+def _modified(key: dict) -> int:
     """Возвращает timestamp последней модификации файла"""
-    return int(
-        datetime.strptime(key.last_modified, "%Y-%m-%d%T%H:%M:%S.%fZ").timestamp() * 1e6
-    )
+    return int(key["LastModified"].timestamp() * 1e6)
 
 
-def get_last_modified_to_datetime(last_modified: str) -> datetime:
-    if last_modified.endswith("z") or last_modified.endswith("Z"):
-        last_modified = last_modified[:-1]
-
-    return datetime.fromisoformat(last_modified).replace(tzinfo=timezone.utc)
+def get_last_modified_to_datetime(last_modified: datetime) -> datetime:
+    return last_modified.replace(tzinfo=timezone.utc)
 
 
-def _get_files(bucket_list: Iterable[Any]) -> Dict[str, int]:
+def _get_files(objects: List[dict]) -> Dict[str, int]:
     files = {}
-    for file in bucket_list:
-        modified = _modified(file)
-        files[file.name] = modified
+    for obj in objects:
+        modified = _modified(obj)
+        files[obj["Key"]] = modified
     return files
 
 
@@ -69,35 +58,31 @@ class CephIOFileNotFoundException(FileNotFoundError):
 
 
 class CephIO(IO[AnyStr]):
-    bucket: Any
-    filename: str
-    _mode: str
-
-    def __init__(self, bucket: Bucket, filename: str, mode: str):
+    def __init__(self, client, bucket: str, filename: str, mode: str):
+        self.client = client
         self.bucket = bucket
         self.filename = filename
         self._mode = mode
-
-    def get_bucket_key(self, filename: str) -> Key:
-        key: Key = self.get_bucket_key(filename)
-        return key
+        self.buffer = io.BytesIO() if "b" in mode else io.StringIO()
 
     def __enter__(self) -> Any:
-        key = self.get_bucket_key(self.filename)
-        if not key:
-            raise CephIOFileNotFoundException(
-                f"{self.filename} does not exist in {self.bucket}"
-            )
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=self.filename)
+            data = response["Body"].read()
+            if "b" in self._mode:
+                self.buffer.write(data)
+            else:
+                self.buffer.write(data.decode("utf-8"))
+            self.buffer.seek(0)
+            return self.buffer
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                raise CephIOFileNotFoundException(
+                    f"{self.filename} does not exist in {self.bucket}"
+                )
 
-        data = key.get_contents_as_string()
-        if self.mode == "r":
-            return io.StringIO(data.decode("utf-8"))
-        elif self.mode == "rb":
-            return io.BytesIO(data)
-        return None
-
-    def __exit__(self, exc_type: Any, exc_value: Any, exc_traceback: Any) -> None:
-        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.buffer.close()
 
     def close(self) -> None:
         pass
@@ -154,47 +139,68 @@ class CephIO(IO[AnyStr]):
 @dataclass(slots=True, frozen=True, eq=True, hash=True)
 class CephFile(IFile):
     _path: PurePath
-    _key: Key
-    _bucket: Bucket
+    _obj: dict
+    _client: Any
 
     def get_path(self) -> PurePath:
         return self._path
 
     def get_last_modified(self):
-        return get_last_modified_to_datetime(self._key.last_modified)
+        return get_last_modified_to_datetime(self._obj["LastModified"])
 
     def open(self, mode="r", *args, **kwargs):
-        return CephIO(bucket=self._bucket, filename=str(self._path), mode=mode)
+        return CephIO(
+            client=self._client,
+            bucket=self._obj["Bucket"],
+            filename=str(self._path),
+            mode=mode,
+        )
 
     def get_universal_name_path(self) -> UniversalNamePath:
         return UniversalNamePath(value=str(self._path))
 
 
 class CephAdapter(IFileStorageAdapter):
-    def __init__(self, bucket: Bucket, prefix: str = ""):
-        self.prefix = prefix
+    def __init__(self, client, bucket: str, prefix: str = ""):
+        self.client = client
         self.bucket = bucket
-        self._diff: Diff = Diff(
-            not_modified=_get_files(self.bucket.list(prefix=self.prefix))
-        )
+        self.prefix = prefix
+        self._diff: Diff = Diff(not_modified=self._list_files())
+
+    def _list_files(self) -> Dict[str, int]:
+        paginator = self.client.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=self.bucket, Prefix=self.prefix)
+        objects = []
+        for page in page_iterator:
+            objects.extend(page.get("Contents", []))
+        return _get_files(objects)
 
     def open(self, filename, mode="r", *args, **kwargs) -> CephIO[Any]:
-        return CephIO(bucket=self.bucket, filename=filename, mode=mode)
+        return CephIO(
+            client=self.client, bucket=self.bucket, filename=filename, mode=mode
+        )
 
     def glob(self, pattern: str):
-        for key in self.bucket.list(prefix=self.prefix):
-            if fnmatch.fnmatch(key.name, pattern):
-                yield CephFile(path=PurePath(key.name), key=key, bucket=self.bucket)
+        paginator = self.client.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=self.bucket, Prefix=self.prefix)
+        for page in page_iterator:
+            for obj in page.get("Contents", []):
+                if fnmatch.fnmatch(obj["Key"], pattern):
+                    yield CephFile(
+                        path=PurePath(obj["Key"]), _obj=obj, _client=self.client
+                    )
 
     def path_exist(self, path: UniversalNamePath) -> bool:
         _path = os.path.join(self.prefix, path.value)
-        for _ in self.bucket.list(prefix=_path):
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=_path)
             return True
-        return False
+        except ClientError:
+            return False
 
     def refresh(self) -> Diff:
         old_files = self._diff.get_files()
-        new_files = _get_files(self.bucket.list(prefix=self.prefix))
+        new_files = self._list_files()
         new_diff = get_diff(old_files=old_files, new_files=new_files)
         self._diff = new_diff
         return new_diff
@@ -204,14 +210,15 @@ class CephAdapterProvider(IFileStorageAdapterProvider):
     class Meta:
         name = "ceph"
 
-    def __init__(self, s3_connection: S3Connection, bucket_name: str, prefix: str = ""):
-        self.s3_connection = s3_connection
+    def __init__(self, client, bucket_name: str, prefix: str = ""):
+        self.client = client
         self.bucket_name = bucket_name
         self.prefix = prefix
 
     def get_adapter(self) -> CephAdapter:
-        bucket = self.s3_connection.get_bucket(self.bucket_name)
-        return CephAdapter(bucket=bucket, prefix=self.prefix)
+        return CephAdapter(
+            client=self.client, bucket=self.bucket_name, prefix=self.prefix
+        )
 
 
 @dataclass(slots=True)
@@ -237,134 +244,172 @@ class BucketSnapshot:
     def __sub__(self, other: "BucketSnapshot") -> BucketSnapshotDiff:
         new = other.keys() - self.keys()
         removed = self.keys() - other.keys()
-        modified = {key for key in self.keys & other.keys() if other[key] != self[key]}
+        modified = {
+            key for key in self.keys() & other.keys() if other[key] != self[key]
+        }
         return BucketSnapshotDiff(new=new, modified=modified, removed=removed)
 
 
-def create_snapshot(bucket: Bucket, prefix: str = "") -> BucketSnapshot:
-    snapshot = {key.name: key.last_modified for key in bucket.list(prefix=prefix)}
+def create_snapshot(client, bucket: str, prefix: str = "") -> BucketSnapshot:
+    paginator = client.get_paginator("list_objects_v2")
+    page_iterator = paginator.paginate(Bucket=bucket, Prefix=prefix)
+    snapshot = {}
+    for page in page_iterator:
+        for obj in page.get("Contents", []):
+            snapshot[obj["Key"]] = obj["ETag"]
     return BucketSnapshot(snapshot)
 
 
 async def create_snapshot_with_debounce(
-    bucket: Bucket, prefix: str = "", refresh_debounce_period_seconds: float = 2.0
+    client, bucket: str, prefix: str = "", refresh_debounce_period_seconds: float = 2.0
 ) -> BucketSnapshot:
-    current_snapshot = create_snapshot(bucket, prefix)
-    while True:
-        await asyncio.sleep(refresh_debounce_period_seconds)
-        new_snapshot = create_snapshot(bucket, prefix)
-        if _diff := current_snapshot - new_snapshot:
-            current_snapshot = new_snapshot
-            continue
-        return new_snapshot
+    current_snapshot = create_snapshot(client, bucket, prefix)
+    await asyncio.sleep(refresh_debounce_period_seconds)
+    new_snapshot = create_snapshot(client, bucket, prefix)
+    if _diff := current_snapshot - new_snapshot:
+        current_snapshot = new_snapshot
+    return new_snapshot
 
 
-def get_or_create_bucket(bucket_name: str, connection: S3Connection) -> Bucket:
+def get_or_create_bucket(client, bucket_name: str) -> None:
     try:
-        return connection.get_bucket(bucket_name)
-    except S3ResponseError:
-        return connection.create_bucket(bucket_name)
+        client.head_bucket(Bucket=bucket_name)
+        print(f"Бакет {bucket_name} уже существует")
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            try:
+                client.create_bucket(Bucket=bucket_name)
+                print(f"Бакет {bucket_name} создан")
+            except ClientError as create_error:
+                raise RuntimeError(f"Ошибка создания бакета: {create_error}")
+        else:
+            raise
 
 
 @dataclass(slots=True)
 class CephStorage:
     bucket_name: str
-    connection: S3Connection
+    client: Any
     create_snapshot_with_debounce: float = 2.0
-
-    _bucket: Bucket = attrib(init=False)
-    _loop = asyncio.AbstractEventLoop = attrib(init=False)
+    _loop: AbstractEventLoop = attrib(init=False)
 
     def __attrs_post_init__(self) -> None:
-        self._bucket = get_or_create_bucket(self.bucket_name, self.connection)
+        get_or_create_bucket(self.client, self.bucket_name)
         self._loop = asyncio.get_running_loop()
 
     async def exists(self, filename: str) -> bool:
-        key = await self._loop.run_in_executor(None, self._bucket.get_key, filename)
-        return key is None
+        try:
+            await self._loop.run_in_executor(
+                None,
+                partial(self.client.head_object, Bucket=self.bucket_name, Key=filename),
+            )
+            return True
+        except ClientError:
+            return False
 
     async def write_file(self, filename: str, content: AnyStr) -> None:
-        key = await self._loop.run_in_executor(None, self._bucket.get_key, filename)
-        if not key:
-            key = await self._loop.run_in_executor(None, self._bucket.new_key, filename)
-        await self._loop.run_in_executor(None, key.set_contents_from_string, content)
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        await self._loop.run_in_executor(
+            None,
+            partial(
+                self.client.put_object,
+                Bucket=self.bucket_name,
+                Key=filename,
+                Body=content,
+            ),
+        )
 
     async def remove_files_by_pattern(self, pattern: str) -> None:
-        keys = await self._loop.run_in_executor(None, self._bucket.list)
-        keys_to_remove = [key for key in keys if fnmatch.fnmatch(key.name, pattern)]
-        await self._loop.run_in_executor(None, self._bucket.delete_keys, keys_to_remove)
+        paginator = self.client.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=self.bucket_name)
+
+        keys_to_remove = []
+        for page in page_iterator:
+            for obj in page.get("Contents", []):
+                if fnmatch.fnmatch(obj["Key"], pattern):
+                    keys_to_remove.append({"Key": obj["Key"]})
+
+        if keys_to_remove:
+            await self._loop.run_in_executor(
+                None,
+                partial(
+                    self.client.delete_objects,
+                    Bucket=self.bucket_name,
+                    Keys=keys_to_remove,
+                ),
+            )
 
     async def remove_file(self, filename: str) -> None:
-        await self._loop.run_in_executor(None, self._bucket.delete_key, filename)
+        await self._loop.run_in_executor(
+            None,
+            partial(self.client.delete_object, Bucket=self.bucket_name, Key=filename),
+        )
 
     async def read_file(self, filename: str) -> Optional[str]:
-        key = await self._loop.run_in_executor(None, self._bucket.get_key, filename)
-        if not key:
+        try:
+            response = await self._loop.run_in_executor(
+                None,
+                partial(self.client.get_object, Bucket=self.bucket_name, Key=filename),
+            )
+            content = await self._loop.run_in_executor(None, response["Body"].read)
+            return content.decode("utf-8")
+        except ClientError:
             return None
-        content = await self._loop.run_in_executor(None, key.get_contents_as_string)
-        return content.decode()
 
     async def get_snapshot(self) -> BucketSnapshot:
         return await create_snapshot_with_debounce(
-            bucket=self._bucket,
+            self.client,
+            self.bucket_name,
             refresh_debounce_period_seconds=self.create_snapshot_with_debounce,
         )
 
     async def list_all_filenames(self) -> List[str]:
-        keys: BucketListResultSet = await self._loop.run_in_executor(
-            None, self._bucket.list
-        )
-        return [key.name for key in keys]
+        paginator = self.client.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=self.bucket_name)
+        filenames = []
+        for page in page_iterator:
+            for obj in page.get("Contents", []):
+                filenames.append(obj["Key"])
+        return filenames
 
-    async def get_all_keys(self) -> List[Key]:
-        keys: BucketListResultSet = await self._loop.run_in_executor(
-            None, self._bucket.list
-        )
-        return list(keys)
+    async def get_all_keys(self) -> List[dict]:
+        paginator = self.client.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=self.bucket_name)
+        keys = []
+        for page in page_iterator:
+            keys.extend(page.get("Contents", []))
+        return keys
 
 
 class CephStorageProvider:
-    def __init__(self, s3_connection: S3Connection, bucket_name: str):
-        self.s3_connection = s3_connection
+    def __init__(self, client, bucket_name: str):
+        self.client = client
         self.bucket_name = bucket_name
 
     def get_storage(self) -> CephStorage:
-        return CephStorage(bucket_name=self.bucket_name, connection=self.s3_connection)
+        return CephStorage(bucket_name=self.bucket_name, client=self.client)
 
 
 def plugin_init(
-    host: str,
-    port: str,
+    endpoint_url: str,
     is_secure: bool = False,
     access_key: Optional[str] = None,
     secret_key: Optional[str] = None,
 ) -> Any:
-    """
-    Плагин для работы с S3 и Ceph в качестве провайдера хранилища. Создает и регистрирует
-    объект S3Connection и регистрирует классы CephAdapterProvider и CephStorageProvider
-    :param host: Хост сефа
-    :param port: Порт
-    :param is_secure: Использование защищенного соединения
-    :param access_key: Access-key
-    :param secret_key: Secret-key
-    Пример конфига::
-        - name: plotva.plugins.s3
-          config:
-            host: 127.0.0.1
-            port: 80
-            is_secure: false
-            access_key: meow
-            secret_key: meow
-    """
-    s3_connection: S3Connection = connect_s3(
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        host=host,
-        port=port,
-        is_secure=is_secure,
-        calling_format=OrdinaryCallingFormat(),
-    )
-
-    yield s3_connection
-    yield Type[CephAdapterProvider]
-    yield Type[CephStorageProvider]
+    cleaned_url = endpoint_url.strip().rstrip("/")
+    try:
+        client = boto3.client(
+            "s3",
+            endpoint_url=cleaned_url,
+            verify=False,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name="ru-7",
+            config=Config(s3={"addressing_style": "path"}, retries={"max_attempts": 3}),
+        )
+        yield client
+        yield Type[CephAdapterProvider]
+        yield Type[CephStorageProvider]
+    except Exception as e:
+        raise RuntimeError(f"Ошибка инициализации клиента: {e}")
