@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+      - id: ruff-format
+        args: [--config, "lint.ignore=['COM812']"]
+
+      - id: ruff
+        name: "Run ruff with --unsafe-fixes --fix arguments manually"
+        alias: ruff-unsafe-fixes
+        args: [--unsafe-fixes, --fix]
+        stages: [manual]
