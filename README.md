@@ -1,5 +1,11 @@
 # plotva.ru
 
+Настройка pre-commit для питонистов
+```
+pip install pre-commit
+pre-commit install
+```
+
 Пример конфига для запуска сервисов:
 
 ```yaml
