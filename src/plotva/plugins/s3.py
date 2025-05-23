@@ -36,6 +36,7 @@ __all__ = [
 _logger = getLogger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
 def _modified(key: dict) -> int:
     """Возвращает timestamp последней модификации файла"""
     return int(key["LastModified"].timestamp() * 1e6)
@@ -274,12 +275,12 @@ async def create_snapshot_with_debounce(
 def get_or_create_bucket(client, bucket_name: str) -> None:
     try:
         client.head_bucket(Bucket=bucket_name)
-        print(f"Бакет {bucket_name} уже существует")
+        _logger.info(f"Бакет {bucket_name} уже существует")
     except ClientError as e:
         if e.response["Error"]["Code"] == "404":
             try:
                 client.create_bucket(Bucket=bucket_name)
-                print(f"Бакет {bucket_name} создан")
+                _logger.info(f"Бакет {bucket_name} создан")
             except ClientError as create_error:
                 raise RuntimeError(f"Ошибка создания бакета: {create_error}")
         else:
