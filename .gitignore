@@ -1,6 +1,6 @@
-*.venv
-*.env
-*.sh
+.venv
+.env
 config.yml
 .ruff-cache/
-__pycache__/
+venv
+__pycache__
