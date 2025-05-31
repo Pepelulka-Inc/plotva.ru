@@ -1,6 +1,0 @@
-.venv
-.env
-config.yml
-.ruff-cache/
-venv
-__pycache__
