@@ -1,0 +1,17 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./linux_prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+volumes:
+  prometheus_data:
+    driver: local
+
+networks:
+  plotva-main-network:
+    external: true # !!!
+    name: plotva-main-network # !!!
