@@ -5,11 +5,11 @@ from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 class DataBase():
     driver = 'postgresql+asyncpg'
-    username = os.getenv('db_username')
-    password = os.getenv('db_password')
-    host = os.getenv('db_host')
-    port = os.getenv('db_port')
-    name = os.getenv('db_name')
+    username = os.getenv('DB_USERNAME')
+    password = os.getenv('DB_PASSWORD')
+    host = os.getenv('DB_HOST')
+    port = os.getenv('DB_PORT')
+    name = os.getenv('DB_NAME')
 
     def __init__(self):
         self._sessionmaker = None

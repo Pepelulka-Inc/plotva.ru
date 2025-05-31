@@ -3,3 +3,4 @@
 *.sh
 config.yml
 .ruff-cache/
+__pycache__/

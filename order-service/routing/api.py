@@ -7,7 +7,7 @@ from schemas import repositories
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 
-logger = logging.getLogger("order_service")
+logger = logging.getLogger(__name__)
 
 api_router = APIRouter(prefix="/api", tags=["order_service_api"])
 
@@ -32,7 +32,7 @@ async def create_order(
         HTTPException 400: При ошибках валидации данных
         HTTPException 500: При внутренних ошибках сервера
     """
-    logger.info(f"Creating order for user {user_id} with data: {data.dict()}")
+    logger.info(f"Creating order for user {user_id} with data: {data.model_dump()}")
     async with session.begin():
         try:
             logger.debug(f"Checking if user {user_id} exists")
