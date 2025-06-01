@@ -1,5 +1,6 @@
 import os
 import asyncio
+import logging
 
 from dotenv import load_dotenv
 
@@ -8,6 +9,7 @@ from infrastructure.database.models import Base
 
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -28,7 +30,7 @@ async def init_db_and_tables():
             return
         except Exception as e:
             if attempt < max_attempts - 1:
-                print(
+                logger.warning(
                     f"Попытка {attempt + 1} не удалась. Повторная попытка через 2 секунды..."
                 )
                 await asyncio.sleep(2)
