@@ -1,10 +1,9 @@
-# main.py
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
-from order_service.database.connection import db
-from order_service.routing.api import api_router
-from order_service.tracing import tracer_manager
+from database.connection import db
+from routing.api import api_router
+from utils.tracer import init_instrumentors
 
 
 @asynccontextmanager
@@ -13,12 +12,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
-tracer_manager.init_tracer(service_name="order_service", app=None)
-
 app = FastAPI(lifespan=lifespan)
-
-tracer_manager.tracer.instrument_app(app)
 app.include_router(api_router)
+init_instrumentors(
+    app,
+)
 
 if __name__ == "__main__":
     uvicorn.run(app="main:app", loop="asyncio")

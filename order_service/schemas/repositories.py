@@ -4,7 +4,7 @@ from sqlalchemy import ForeignKey, Integer, BigInteger, delete, select, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
-from order_service.models import OrderStatus
+from models import OrderStatus
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 

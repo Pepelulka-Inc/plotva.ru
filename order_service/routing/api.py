@@ -1,21 +1,20 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from order_service.database.connection import get_db_session
-from order_service.schemas import api
-from order_service.schemas import repositories
+from database.connection import get_db_session
+from schemas import api
+from schemas import repositories
 from sqlalchemy.exc import SQLAlchemyError
 import logging
-from order_service.tracing import tracer_manager
-
+from utils.tracer import Tracer
 
 logger = logging.getLogger(__name__)
 
 api_router = APIRouter(prefix="/api", tags=["order_service_api"])
 
-
-def get_tracer():
-    return tracer_manager.get_tracer()
+main_tracer = Tracer(
+    service_name="order_service", otlp_endpoint="http://localhost:4317/v1/traces"
+)
 
 
 @api_router.post("/user/{user_id}/order/create")
@@ -39,8 +38,7 @@ async def create_order(
         HTTPException 400: При ошибках валидации данных
         HTTPException 500: При внутренних ошибках сервера
     """
-    tracer = get_tracer()
-    with tracer.opentelemetry_tracer.start_as_current_span("create_order") as span:
+    with main_tracer.opentelemetry_tracer.start_as_current_span("create_order") as span:
         span.set_attribute("user_id", str(user_id))
         span.set_attribute("product_count", len(data.product_ids_list))
 
@@ -97,8 +95,9 @@ async def get_user_orders(
     Returns:
         OrderResponse со списком заказов или сообщением об ошибке
     """
-    tracer = get_tracer()
-    with tracer.opentelemetry_tracer.start_as_current_span("get_user_orders") as span:
+    with main_tracer.opentelemetry_tracer.start_as_current_span(
+        "get_user_orders"
+    ) as span:
         span.set_attribute("user_id", str(user_id))
 
         logger.info(f"Fetching orders for user {user_id}")
@@ -136,8 +135,9 @@ async def get_order_details(
     Returns:
         OrderResponse с данными заказа или сообщением об ошибке
     """
-    tracer = get_tracer()
-    with tracer.opentelemetry_tracer.start_as_current_span("get_order_details") as span:
+    with main_tracer.opentelemetry_tracer.start_as_current_span(
+        "get_order_details"
+    ) as span:
         span.set_attribute("order_id", str(order_id))
 
         logger.info(f"Fetching details for order {order_id}")
@@ -186,8 +186,7 @@ async def update_order_status(
     Returns:
         SetStatusResponse с новым статусом или сообщением об ошибке
     """
-    tracer = get_tracer()
-    with tracer.opentelemetry_tracer.start_as_current_span(
+    with main_tracer.opentelemetry_tracer.start_as_current_span(
         "update_order_status"
     ) as span:
         span.set_attribute("order_id", str(order_id))
@@ -264,8 +263,7 @@ async def delete_order(
         HTTPException 404: Если заказ не найден
         HTTPException 500: При ошибках базы данных
     """
-    tracer = get_tracer()
-    with tracer.opentelemetry_tracer.start_as_current_span("delete_order") as span:
+    with main_tracer.opentelemetry_tracer.start_as_current_span("delete_order") as span:
         span.set_attribute("order_id", str(order_id))
 
         logger.info(f"Deleting order {order_id}")
@@ -316,8 +314,7 @@ async def update_order(
     Returns:
         UpdateOrderResponse со списком измененных полей или ошибкой
     """
-    tracer = get_tracer()
-    with tracer.opentelemetry_tracer.start_as_current_span("update_order") as span:
+    with main_tracer.opentelemetry_tracer.start_as_current_span("update_order") as span:
         span.set_attribute("order_id", str(order_id))
 
         logger.info(f"Updating order {order_id}")

@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel as PydanticBaseModel, Field
 from datetime import datetime, timedelta
-from order_service.models import OrderStatus
+from models import OrderStatus
 
 
 class BaseRequest(PydanticBaseModel):
