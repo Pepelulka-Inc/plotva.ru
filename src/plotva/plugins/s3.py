@@ -3,14 +3,14 @@ from asyncio import AbstractEventLoop
 from functools import partial
 import io
 import os
-import urllib3
 import fnmatch
 from datetime import timezone, datetime
 from logging import getLogger
 from pathlib import PurePath
 from typing import Iterable, Dict, Any, IO, AnyStr, Optional, Iterator, List, Set, Type
 
-from attr import attrib, dataclass
+import urllib3
+from attr import dataclass
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -292,15 +292,18 @@ class CephStorage:
     bucket_name: str
     client: Any
     create_snapshot_with_debounce: float = 2.0
-    _loop: AbstractEventLoop = attrib(init=False)
+    _loop: Optional[AbstractEventLoop] = None
 
     def __attrs_post_init__(self) -> None:
         get_or_create_bucket(self.client, self.bucket_name)
-        self._loop = asyncio.get_running_loop()
+
+    async def _get_loop(self) -> AbstractEventLoop:
+        return asyncio.get_event_loop()
 
     async def exists(self, filename: str) -> bool:
+        loop = await self._get_loop()
         try:
-            await self._loop.run_in_executor(
+            await loop.run_in_executor(
                 None,
                 partial(self.client.head_object, Bucket=self.bucket_name, Key=filename),
             )
@@ -309,9 +312,10 @@ class CephStorage:
             return False
 
     async def write_file(self, filename: str, content: AnyStr) -> None:
+        loop = await self._get_loop()
         if isinstance(content, str):
             content = content.encode("utf-8")
-        await self._loop.run_in_executor(
+        await loop.run_in_executor(
             None,
             partial(
                 self.client.put_object,
@@ -322,6 +326,7 @@ class CephStorage:
         )
 
     async def remove_files_by_pattern(self, pattern: str) -> None:
+        loop = await self._get_loop()
         paginator = self.client.get_paginator("list_objects_v2")
         page_iterator = paginator.paginate(Bucket=self.bucket_name)
 
@@ -332,7 +337,7 @@ class CephStorage:
                     keys_to_remove.append({"Key": obj["Key"]})
 
         if keys_to_remove:
-            await self._loop.run_in_executor(
+            await loop.run_in_executor(
                 None,
                 partial(
                     self.client.delete_objects,
@@ -342,14 +347,16 @@ class CephStorage:
             )
 
     async def remove_file(self, filename: str) -> None:
-        await self._loop.run_in_executor(
+        loop = await self._get_loop()
+        await loop.run_in_executor(
             None,
             partial(self.client.delete_object, Bucket=self.bucket_name, Key=filename),
         )
 
     async def read_file(self, filename: str) -> Optional[str]:
+        loop = await self._get_loop()
         try:
-            response = await self._loop.run_in_executor(
+            response = await loop.run_in_executor(
                 None,
                 partial(self.client.get_object, Bucket=self.bucket_name, Key=filename),
             )
