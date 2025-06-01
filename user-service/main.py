@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from uuid import UUID
 from aiohttp import web
@@ -14,7 +15,6 @@ logger = logging.getLogger("user-service")
 
 async def get_uow(app: web.Application) -> UnitOfWork:
     return UnitOfWork(engine=app["engine"])
-
 
 
 async def update_user_handler(request: web.Request) -> web.Response:
@@ -58,6 +58,7 @@ async def create_user_handler(request: web.Request) -> web.Response:
 app = web.Application()
 app["engine"] = engine
 
+
 async def on_startup(app):
     try:
         await init_db_and_tables()
@@ -72,8 +73,6 @@ app.router.add_post("/users", create_user_handler)
 app.on_startup.append(on_startup)
 
 if __name__ == "__main__":
-    import asyncio
-
     loop = asyncio.SelectorEventLoop()
     asyncio.set_event_loop(loop)
     web.run_app(app, port=9002)
