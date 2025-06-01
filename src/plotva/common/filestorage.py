@@ -6,6 +6,16 @@ from typing import IO, Any, Dict, Iterable
 from attr import attrib, dataclass
 
 
+__all__ = [
+    "IFileStorageAdapter",
+    "IFileStorageAdapterProvider",
+    "Diff",
+    "get_diff",
+    "UniversalNamePath",
+    "IFile",
+]
+
+
 @dataclass
 class Diff:
     new: Dict[str, int] = attrib(factory=dict)
@@ -94,5 +104,4 @@ def get_diff(old_files: Dict[str, int], new_files: Dict[str, int]) -> Diff:
 
 class IFileStorageAdapterProvider(metaclass=ABCMeta):
     @abstractmethod
-    def get_adapter(self) -> IFileStorageAdapter:
-        ...
+    def get_adapter(self) -> IFileStorageAdapter: ...
