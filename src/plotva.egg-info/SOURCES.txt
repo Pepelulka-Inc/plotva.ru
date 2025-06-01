@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/plotva.egg-info/PKG-INFO
+src/plotva.egg-info/SOURCES.txt
+src/plotva.egg-info/dependency_links.txt
+src/plotva.egg-info/top_level.txt
+src/plotva/common/filestorage.py
+src/plotva/common/tracing/tracer.py
+src/plotva/plugins/s3.py

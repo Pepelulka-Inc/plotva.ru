@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=plotva
+      - POSTGRES_HOST=localhost
+      - POSTGRES_PORT=5432
+    ports:
+      - "8000:8000"
+    networks:
+      - plotva-network
+      - monitoring_default
+    volumes:
+      - ../src:/app/src
+
+networks:
+  plotva-network:
+    driver: bridge
+  monitoring_default:
+    external: true
