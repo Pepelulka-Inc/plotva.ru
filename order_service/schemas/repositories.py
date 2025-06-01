@@ -5,22 +5,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
 from order_service.models import OrderStatus
-from sqlalchemy.ext.asyncio import AsyncAttrs, async_session
+from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
 
 class BaseModel(AsyncAttrs, DeclarativeBase):
+    __table_args__ = {"schema": "plotva"}
+
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
     @classmethod
-    async def insert(cls, session: async_session, *args, **kwargs):
+    async def insert(cls, session: AsyncSession, *args, **kwargs):
         async with session.begin():
             session.add(cls(*args, **kwargs))
             await session.commit()
 
     @classmethod
-    async def flush_insert(cls, session: async_session, *args, **kwargs):
+    async def flush_insert(cls, session: AsyncSession, *args, **kwargs):
         """
         метод вызывается только внутри уже открытой сессии
         async with session.begin():
@@ -29,6 +31,17 @@ class BaseModel(AsyncAttrs, DeclarativeBase):
         session.add(cls_object)
         await session.flush()
         return cls_object
+
+
+class SellersModel(BaseModel):
+    __tablename__ = "sellers"
+
+    seller_id: Mapped[UUID] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str]
+    description: Mapped[str]
+    photo_url: Mapped[str]
+    phone_number: Mapped[str]
+    email: Mapped[str]
 
 
 class ProductCategoriesModel(BaseModel):
@@ -63,14 +76,13 @@ class ProductsModel(BaseModel):
     """
 
     __tablename__ = "products"
-    __table_args__ = {"schema": "plotva"}
 
     product_id: Mapped[UUID] = mapped_column(primary_key=True, index=True)
     name: Mapped[str]
     description: Mapped[str]
-    seller_id: Mapped[UUID] = mapped_column(ForeignKey("sellers.seller_id"))
+    seller_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.sellers.seller_id"))
     category: Mapped[str] = mapped_column(
-        ForeignKey("product_categories.category_name")
+        ForeignKey("plotva.product_categories.category_name")
     )
     photo_url: Mapped[str]
     creation_time: Mapped[datetime]
@@ -113,8 +125,8 @@ class CommentsModel(BaseModel):
     __tablename__ = "comments"
 
     comment_id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"))
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.user_id"))
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.products.product_id"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.users.user_id"))
     content: Mapped[str]
     rating: Mapped[int]
     time: Mapped[datetime]
@@ -122,21 +134,8 @@ class CommentsModel(BaseModel):
     user_ref: Mapped["UsersModel"] = relationship("UsersModel", backref="comments")
 
 
-class SellersModel(BaseModel):
-    __tablename__ = "sellers"
-    __table_args__ = {"schema": "plotva"}
-
-    seller_id: Mapped[UUID] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str]
-    description: Mapped[str]
-    photo_url: Mapped[str]
-    phone_number: Mapped[str]
-    email: Mapped[str]
-
-
 class UsersModel(BaseModel):
     __tablename__ = "users"
-    __table_args__ = {"schema": "plotva"}
 
     user_id: Mapped[UUID] = mapped_column(primary_key=True, index=True)
     name: Mapped[str]
@@ -167,9 +166,9 @@ class UsersModel(BaseModel):
 
 class UserAddressesModel(BaseModel):
     __tablename__ = "user_addresses"
-    __table_args__ = {"schema": "plotva"}
+
     address_id: Mapped[UUID] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.user_id"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.users.user_id"))
     country: Mapped[str]
     settlement: Mapped[str]
     street: Mapped[str]
@@ -182,12 +181,14 @@ class UserAddressesModel(BaseModel):
 
 class ShoppingCartEntriesModel(BaseModel):
     __tablename__ = "shopping_cart_entries"
-    __table_args__ = {"schema": "plotva"}
+
     entry_id: Mapped[int] = mapped_column(primary_key=True, index=True)
     product_id: Mapped[UUID] = mapped_column(
-        ForeignKey("products.product_id"), index=True
+        ForeignKey("plotva.products.product_id"), index=True
     )
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.user_id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("plotva.users.user_id"), index=True
+    )
     quantity: Mapped[int] = mapped_column(Integer)
 
 
@@ -195,12 +196,14 @@ class OrdersModel(BaseModel):
     """Модель заказов в системе."""
 
     __tablename__ = "orders"
-    __table_args__ = {"schema": "plotva"}
+
     order_id: Mapped[UUID] = mapped_column(
         primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
     )
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.user_id"))
-    address_id: Mapped[UUID] = mapped_column(ForeignKey("user_addresses.address_id"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.users.user_id"))
+    address_id: Mapped[UUID] = mapped_column(
+        ForeignKey("plotva.user_addresses.address_id")
+    )
     status: Mapped[str]
     order_date: Mapped[datetime]
     shipped_date: Mapped[datetime]
@@ -417,10 +420,10 @@ class OrderEntriesModel(BaseModel):
     """Модель позиций заказа. Каждая запись представляет один товар в заказе"""
 
     __tablename__ = "order_entries"
-    __table_args__ = {"schema": "plotva"}
+
     entry_id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.order_id"))
-    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"))
+    order_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.orders.order_id"))
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("plotva.products.product_id"))
     quantity: Mapped[int]
     product_name: Mapped[str]
     product_price_rub: Mapped[int]
@@ -430,10 +433,10 @@ class OrderEntriesModel(BaseModel):
 
 class ProductPricesHistoryModel(BaseModel):
     __tablename__ = "product_prices_history"
-    __table_args__ = {"schema": "plotva"}
+
     entry_id: Mapped[int] = mapped_column(primary_key=True, index=True)
     product_id: Mapped[UUID] = mapped_column(
-        ForeignKey("products.product_id"), index=True
+        ForeignKey("plotva.products.product_id"), index=True
     )
     price_rub: Mapped[int]
     valid_from: Mapped[datetime]

@@ -16,7 +16,7 @@ class Tracer:
     def __init__(
         self,
         service_name: str,
-        app: FastAPI,
+        app: FastAPI = None,
         otlp_endpoint: str = "http://alloy:4317/v1/traces",
     ):
         resource = Resource.create(attributes={SERVICE_NAME: service_name})
@@ -33,5 +33,13 @@ class Tracer:
 
         self.opentelemetry_tracer = trace.get_tracer(__name__)
 
-        FastAPIInstrumentor().instrument_app(app)
+        # Инструментируем requests сразу
         RequestsInstrumentor().instrument()
+
+        # Если приложение передано, инструментируем его
+        if app is not None:
+            self.instrument_app(app)
+
+    def instrument_app(self, app: FastAPI):
+        """Инструментирует приложение FastAPI middleware для трейсинга"""
+        FastAPIInstrumentor().instrument_app(app)

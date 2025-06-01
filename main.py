@@ -13,10 +13,12 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
-app.include_router(api_router)
+tracer_manager.init_tracer(service_name="order_service", app=None)
 
-tracer_manager.init_tracer(service_name="order_service", app=app)
+app = FastAPI(lifespan=lifespan)
+
+tracer_manager.tracer.instrument_app(app)
+app.include_router(api_router)
 
 if __name__ == "__main__":
     uvicorn.run(app="main:app", loop="asyncio")
