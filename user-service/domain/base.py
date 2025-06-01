@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from domain.repositories.user_repository import IUserRepository
 from domain.repositories.cart_repository import ICartRepository
 

@@ -1,9 +1,9 @@
 from uuid import UUID
 from typing import Optional
+
 from attr import dataclass
 
 from domain.base import IUnitOfWork, BaseUseCase
-
 from infrastructure.database.models import UserModel
 from app.dtos.user_dtos import UpdateUserDTO
 

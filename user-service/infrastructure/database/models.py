@@ -14,7 +14,7 @@ class UserModel(Base):
     email = Column(String(255), unique=True, nullable=False)
     hashed_password_base64 = Column(String(255), nullable=False)
     cart_entries = relationship("ShoppingCartEntry", back_populates="user_model")
-    
+
     def to_dict(self):
         return {
             "user_id": str(self.user_id),
@@ -22,8 +22,9 @@ class UserModel(Base):
             "surname": self.surname,
             "photo_url": self.photo_url,
             "phone_number": self.phone_number,
-            "email": self.email
+            "email": self.email,
         }
+
 
 class ShoppingCartEntry(Base):
     __tablename__ = "shopping_cart_entries"
@@ -33,3 +34,11 @@ class ShoppingCartEntry(Base):
     quantity = Column(Integer, default=1)
 
     user_model = relationship("UserModel", back_populates="cart_entries")
+
+    def to_dict(self):
+        return {
+            "entry_id": int(self.entry_id),
+            "product_id": self.product_id,
+            "user_id": self.user_id,
+            "quantity": self.quantity,
+        }

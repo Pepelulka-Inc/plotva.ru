@@ -1,10 +1,11 @@
 from attr import dataclass
+
 from domain.base import IUnitOfWork, BaseUseCase
 from app.dtos.cart_dtos import RemoveProductFromCartDTO
 
 
 @dataclass(slots=True)
-class RemoveProductFromCartUseCase:
+class RemoveProductFromCartUseCase(BaseUseCase):
     uow: IUnitOfWork
 
     async def __call__(self, dto: RemoveProductFromCartDTO) -> bool:

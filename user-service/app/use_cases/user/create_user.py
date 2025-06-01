@@ -1,4 +1,5 @@
 from uuid import uuid4
+
 from attr import dataclass
 
 from domain.base import IUnitOfWork, BaseUseCase

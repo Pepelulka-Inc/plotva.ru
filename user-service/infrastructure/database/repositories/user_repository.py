@@ -1,7 +1,9 @@
 from typing import Optional
 from uuid import UUID
+
 from sqlalchemy import select, insert, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from domain.entities.user import User
 from domain.repositories.user_repository import IUserRepository
 from infrastructure.database.models import UserModel

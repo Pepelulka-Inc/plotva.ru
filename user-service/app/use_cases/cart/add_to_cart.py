@@ -1,4 +1,5 @@
-from uuid import uuid4
+import random
+
 from attr import dataclass
 
 from app.dtos.cart_dtos import AddProductToCartDTO
@@ -7,7 +8,7 @@ from domain.entities.cart import Cart
 
 
 @dataclass(slots=True)
-class AddProductToCartUseCase:
+class AddProductToCartUseCase(BaseUseCase):
     uow: IUnitOfWork
 
     async def __call__(self, dto: AddProductToCartDTO) -> None:
@@ -21,7 +22,7 @@ class AddProductToCartUseCase:
                 await self.uow.cart_repo.update_product(existing_item)
             else:
                 cart = Cart(
-                    entry_id=str(uuid4()),
+                    entry_id=random.randint(1, 99999),
                     user_id=dto.user_id,
                     product_id=dto.product_id,
                     quantity=dto.quantity,

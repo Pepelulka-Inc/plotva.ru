@@ -1,4 +1,5 @@
 from uuid import UUID
+
 from attr import dataclass
 
 from domain.base import IUnitOfWork, BaseUseCase
@@ -7,7 +8,7 @@ from app.dtos.cart_dtos import ClearCartDTO
 
 
 @dataclass(slots=True)
-class ClearCartUseCase:
+class ClearCartUseCase(BaseUseCase):
     uow: IUnitOfWork
 
     async def __call__(self, dto: ClearCartDTO) -> bool:
