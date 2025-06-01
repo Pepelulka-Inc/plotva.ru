@@ -1,0 +1,33 @@
+project_root: /home/pepelulka/mai/plotva.ru/
+
+services:
+  - compose_file_path: infra/postgres/postgres.docker-compose.yml # postgres
+    req_env_vars:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+  - compose_file_path: infra/kafka/kafka.docker-compose.yml # kafka
+  - compose_file_path: infra/clickhouse/clickhouse.docker-compose.yml #clickhouse
+    req_env_vars:
+      - CLICKHOUSE_DB
+      - CLICKHOUSE_USER
+      - CLICKHOUSE_PASSWORD
+  - compose_file_path: product-service/docker-compose.yaml # product-service
+    custom_build:
+      command:
+        dir: ./
+        args: ["docker", "build", "-t", "product-service", "-f", "./product-service/Dockerfile", "."]
+    start_cooldown: 1
+  - compose_file_path: infra/monitoring/docker-compose.yml # monitoring
+  - compose_file_path: order_service/docker-compose.yaml # orders-service
+    req_env_vars:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - OLTP_ENDPOINT
+    custom_build:
+      command:
+        dir: ./
+        args: ["docker", "build", "-t", "orders-service", "-f", "./order_service/Dockerfile", "."]

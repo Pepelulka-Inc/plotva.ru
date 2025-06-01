@@ -1,0 +1,15 @@
+services:
+  orders-service:
+    image: orders-service
+    container_name: plotva-orders-service
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - OLTP_ENDPOINT
+    ports:
+      - "8082:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
