@@ -25,7 +25,7 @@ func main() {
 	}
 
 	if len(args) < 2 {
-		panic("missing command ('start' or 'stop')")
+		panic("missing command ('start', 'stop' or 'restart')")
 	}
 
 	godotenv.Load(".env", "env.env")
@@ -36,14 +36,22 @@ func main() {
 	dockerExec := internal.NewDockerComposeExecutor(cfg.ProjectRoot)
 
 	if args[1] == "start" {
-		err := dockerExec.StartManyServicesWithRollback(cfg.Services)
+		err := dockerExec.StartManyTasksWithRollbackInServices(cfg.Tasks)
 		failOnError(err)
 	} else if args[1] == "stop" {
-		errorMap, outpMap := dockerExec.StopManyServices(cfg.Services)
+		errorMap, outpMap := dockerExec.StopManyServicesInTasks(cfg.Tasks)
 		for idx, err := range errorMap {
 			fmt.Printf("%d service: error while stopping: %s\n", idx, err)
 			internal.NiceOutput(outpMap[idx], strconv.FormatInt(int64(idx), 10))
 		}
+	} else if args[1] == "restart" {
+		errorMap, outpMap := dockerExec.StopManyServicesInTasks(cfg.Tasks)
+		for idx, err := range errorMap {
+			fmt.Printf("%d service: error while stopping: %s\n", idx, err)
+			internal.NiceOutput(outpMap[idx], strconv.FormatInt(int64(idx), 10))
+		}
+		err := dockerExec.StartManyTasksWithRollbackInServices(cfg.Tasks)
+		failOnError(err)
 	} else {
 		fmt.Printf("unknown command %s\n", args[1])
 	}

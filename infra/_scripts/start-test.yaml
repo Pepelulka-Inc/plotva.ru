@@ -1,0 +1,17 @@
+project_root: /home/pepelulka/mai/plotva.ru/
+
+tasks:
+  - basic_command:
+      command:
+        dir: ./
+        args: ["echo", "pepelulka"]
+  - basic_command:
+      command:
+        dir: infra/postgres/migrations
+        args: ["goose", "postgres", "user=${POSTGRES_USER} host=${POSTGRES_HOST_FROM_HOST} port=${POSTGRES_PORT_FROM_HOST} password=${POSTGRES_PASSWORD} sslmode=disable dbname=${POSTGRES_DB}", "up"]
+        req_env_vars:
+          - POSTGRES_DB
+          - POSTGRES_USER
+          - POSTGRES_PASSWORD
+          - POSTGRES_HOST_FROM_HOST
+          - POSTGRES_PORT_FROM_HOST

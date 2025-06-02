@@ -35,6 +35,8 @@ func NewDockerComposeExecutor(projectRoot string) DockerComposeExecutor {
 }
 
 func (e *DockerComposeExecutor) StartService(service models.DockerComposeService) ([]byte, error) {
+	slog.Info(fmt.Sprintf("Starting service %s", service.ComposeFilePath))
+
 	if service.CustomBuild != nil {
 		outp, err := e.Executor.RunSync(service.CustomBuild.BuildCommand)
 		if err != nil {
@@ -68,6 +70,7 @@ func (e *DockerComposeExecutor) StartService(service models.DockerComposeService
 }
 
 func (e *DockerComposeExecutor) StopService(service models.DockerComposeService) ([]byte, error) {
+	slog.Info(fmt.Sprintf("Stopping service %s", service.ComposeFilePath))
 	return e.Executor.RunSync(
 		models.Command{
 			Directory: path.Dir(service.ComposeFilePath),
@@ -84,33 +87,62 @@ func (e *DockerComposeExecutor) StopService(service models.DockerComposeService)
 	)
 }
 
-func (e *DockerComposeExecutor) StartManyServicesWithRollback(services []models.DockerComposeService) error {
-	slog.Info("starting services...")
-	for idx, service := range services {
-		outp, err := e.StartService(service)
-		if err != nil {
-			// doing rollback
+func (e *DockerComposeExecutor) StartManyTasksWithRollbackInServices(tasks []models.Task) error {
+	slog.Info("starting tasks...")
+	for idx, task := range tasks {
+		doRollback := func(idx int) {
 			for i := idx - 1; i >= 0; i-- {
-				stopOutp, stopErr := e.StopService(services[i])
+				if tasks[i].Service == nil {
+					continue
+				}
+				stopOutp, stopErr := e.StopService(*tasks[i].Service)
 				if stopErr != nil {
 					slog.Warn(fmt.Sprintf("error while doing rollback (can't stop service): %s", stopErr))
-					NiceOutput(stopOutp, services[i].ComposeFilePath)
+					NiceOutput(stopOutp, tasks[i].Service.ComposeFilePath)
 				}
 			}
+		}
+
+		if task.BasicCommand != nil {
+			_, err := collectEnvVars(task.BasicCommand.RequiredEnvVars)
+			if err != nil {
+				return err
+			}
+
+			outp, err := e.Executor.RunSync(task.BasicCommand.Command)
+			NiceOutput(outp, fmt.Sprintf("output for basic command: %v", task.BasicCommand.Command.Args))
+			if err != nil {
+				slog.Warn(fmt.Sprintf("error executing basic command: %v", task.BasicCommand.Command.Args))
+				doRollback(idx)
+				return err
+			}
+		}
+
+		if task.Service == nil {
+			continue
+		}
+
+		outp, err := e.StartService(*task.Service)
+		if err != nil {
+			// doing rollback
+			doRollback(idx)
 			slog.Warn("error starting service:")
-			NiceOutput(outp, service.ComposeFilePath)
+			NiceOutput(outp, task.Service.ComposeFilePath)
 			return err
 		}
 	}
 	return nil
 }
 
-func (e *DockerComposeExecutor) StopManyServices(services []models.DockerComposeService) (map[int]error, map[int][]byte) {
+func (e *DockerComposeExecutor) StopManyServicesInTasks(tasks []models.Task) (map[int]error, map[int][]byte) {
 	errorMap := make(map[int]error)
 	outpMap := make(map[int][]byte)
 	slog.Info("stopping services...")
-	for idx, service := range services {
-		outp, err := e.StopService(service)
+	for idx, task := range tasks {
+		if task.Service == nil {
+			continue
+		}
+		outp, err := e.StopService(*task.Service)
 		if err != nil {
 			errorMap[idx] = err
 			outpMap[idx] = outp

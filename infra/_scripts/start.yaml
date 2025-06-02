@@ -1,33 +1,81 @@
 project_root: /home/pepelulka/mai/plotva.ru/
 
-services:
-  - compose_file_path: infra/postgres/postgres.docker-compose.yml # postgres
-    req_env_vars:
-      - POSTGRES_DB
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-  - compose_file_path: infra/kafka/kafka.docker-compose.yml # kafka
-  - compose_file_path: infra/clickhouse/clickhouse.docker-compose.yml #clickhouse
-    req_env_vars:
-      - CLICKHOUSE_DB
-      - CLICKHOUSE_USER
-      - CLICKHOUSE_PASSWORD
-  - compose_file_path: product-service/docker-compose.yaml # product-service
-    custom_build:
+tasks:
+  - service:
+      compose_file_path: infra/postgres/postgres.docker-compose.yml # postgres
+      req_env_vars:
+        - POSTGRES_DB
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+  - service:
+      compose_file_path: infra/kafka/kafka.docker-compose.yml # kafka
+  - service:
+      compose_file_path: infra/clickhouse/clickhouse.docker-compose.yml #clickhouse
+      req_env_vars:
+        - CLICKHOUSE_DB
+        - CLICKHOUSE_USER
+        - CLICKHOUSE_PASSWORD
+  - service:
+      compose_file_path: infra/monitoring/docker-compose.yml # monitoring
+  - basic_command: # migrations
       command:
-        dir: ./
-        args: ["docker", "build", "-t", "product-service", "-f", "./product-service/Dockerfile", "."]
-    start_cooldown: 1
-  - compose_file_path: infra/monitoring/docker-compose.yml # monitoring
-  - compose_file_path: order_service/docker-compose.yaml # orders-service
-    req_env_vars:
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB
-      - POSTGRES_HOST
-      - POSTGRES_PORT
-      - OLTP_ENDPOINT
-    custom_build:
-      command:
-        dir: ./
-        args: ["docker", "build", "-t", "orders-service", "-f", "./order_service/Dockerfile", "."]
+        dir: infra/postgres/migrations
+        args: ["goose", "postgres", "user=${POSTGRES_USER} host=${POSTGRES_HOST_FROM_HOST} port=${POSTGRES_PORT_FROM_HOST} password=${POSTGRES_PASSWORD} sslmode=disable dbname=${POSTGRES_DB}", "up"]
+        req_env_vars:
+          - POSTGRES_DB
+          - POSTGRES_USER
+          - POSTGRES_PASSWORD
+          - POSTGRES_HOST_FROM_HOST
+          - POSTGRES_PORT_FROM_HOST
+  - service:
+      compose_file_path: product-service/docker-compose.yaml # product-service
+      custom_build:
+        command:
+          dir: ./
+          args: ["docker", "build", "-t", "product-service", "-f", "./product-service/Dockerfile", "."]
+      start_cooldown: 1
+  - service:
+      compose_file_path: order_service/docker-compose.yaml # orders-service
+      req_env_vars:
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_DB
+        - POSTGRES_HOST
+        - POSTGRES_PORT
+        - OLTP_ENDPOINT
+      custom_build:
+        command:
+          dir: ./
+          args: ["docker", "build", "-t", "orders-service", "-f", "./order_service/Dockerfile", "."]
+  - service:
+      compose_file_path: user_service/docker-compose.yaml # user-service
+      req_env_vars:
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_HOST
+        - POSTGRES_NAME
+        - POSTGRES_PORT
+        - S3_ENDPOINT
+        - S3_ACCESS_KEY
+        - S3_SECRET_KEY
+        - DB_USER
+        - DB_PASSWORD
+        - DB_HOST
+        - DB_NAME
+      custom_build:
+        command:
+          dir: ./
+          args: ["docker", "build", "-t", "user-service", "-f", "./user_service/Dockerfile", "."]
+  - service:
+      compose_file_path: auth-service/docker-compose.yaml # auth-service
+      req_env_vars:
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_DB
+        - POSTGRES_HOST
+        - POSTGRES_PORT
+        - OLTP_ENDPOINT
+      custom_build:
+        command:
+          dir: ./
+          args: ["docker", "build", "-t", "auth-service", "-f", "./auth-service/Dockerfile", "."]
