@@ -1,13 +1,12 @@
 import asyncio
 import signal
 
-from handlers import init_indexes, do
+from handlers import init_indexes, process_topic
 
 from consumer import Consumer
 
 
-# init_indexes()
-
+init_indexes()
 
 async def main():
     product_consumer = Consumer("products")
@@ -18,8 +17,6 @@ async def main():
     await seller_consumer.start()
     await comment_consumer.start()
 
-    print("here", flush=True)
-
     async def stop():
         await product_consumer.stop()
         await seller_consumer.stop()
@@ -29,8 +26,10 @@ async def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, lambda: asyncio.create_task(stop()))
 
-    await product_consumer.consume(do)
-    await seller_consumer.consume(do)
-    await comment_consumer.consume(do)
+    await asyncio.gather(
+        product_consumer.consume(process_topic),
+        seller_consumer.consume(process_topic),
+        comment_consumer.consume(process_topic)
+    )
 
 asyncio.run(main())

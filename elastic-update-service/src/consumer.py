@@ -60,6 +60,6 @@ class Consumer:
         try:
             async for msg in self._consumer:
                 data = json.loads(msg.value)
-                await handler(data)
+                await handler(data, self.topic_name)
         except AsyncKafkaError as e:
             logger.error(f"Can't read messages from {self.topic_name} topic", exc_info=True)
