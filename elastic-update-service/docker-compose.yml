@@ -1,0 +1,13 @@
+services:
+  elastic-update-service:
+    build:
+      dockerfile: Dockerfile
+    container_name: elastic-update-service
+    networks:
+      - elastic-net
+
+networks:
+  elastic-net:
+    external:
+      true
+      

@@ -1,0 +1,4 @@
+aiohttp 
+requests
+aiokafka
+kafka-python
