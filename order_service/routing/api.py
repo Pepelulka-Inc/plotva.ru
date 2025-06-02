@@ -7,13 +7,16 @@ from schemas import repositories
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 from utils.tracer import Tracer
+import os
 
 logger = logging.getLogger(__name__)
 
 api_router = APIRouter(prefix="/api", tags=["order_service_api"])
 
+OLTP_ENDPOINT = os.getenv("OLTP_ENDPOINT")
+
 main_tracer = Tracer(
-    service_name="order_service", otlp_endpoint="http://localhost:4317/v1/traces"
+    service_name="order_service", otlp_endpoint=OLTP_ENDPOINT
 )
 
 

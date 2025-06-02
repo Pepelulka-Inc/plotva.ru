@@ -1,0 +1,14 @@
+services:
+  product-service:
+    image: product-service
+    container_name: plotva-product-service
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    ports:
+      - "8081:8081"
+    volumes:
+      - ../cfg/config.yml:/cfg/config.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
