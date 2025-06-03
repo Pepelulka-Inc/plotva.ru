@@ -1,0 +1,14 @@
+services:
+  search-service:
+    build:
+      dockerfile: Dockerfile
+    networks:
+      - elastic-net
+    ports:
+      - "8000:8000"
+
+networks:
+  elastic-net:
+    external:
+      true
+      
