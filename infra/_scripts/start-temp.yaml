@@ -8,36 +8,31 @@ tasks:
         - POSTGRES_USER
         - POSTGRES_PASSWORD
   - service:
-      compose_file_path: infra/monitoring/docker-compose.yml # monitoring
-  - service:
-      compose_file_path: user_service/docker-compose.yaml # user-service
+      compose_file_path: infra/clickhouse/clickhouse.docker-compose.yml #clickhouse
       req_env_vars:
-        - POSTGRES_USER
-        - POSTGRES_PASSWORD
-        - POSTGRES_HOST
-        - POSTGRES_NAME
-        - POSTGRES_PORT
-        - S3_ENDPOINT
-        - S3_ACCESS_KEY
-        - S3_SECRET_KEY
-        - DB_USER
-        - DB_PASSWORD
-        - DB_HOST
-        - DB_NAME
-      custom_build:
-        command:
-          dir: ./
-          args: ["docker", "build", "-t", "user-service", "-f", "./user_service/Dockerfile", "."]
+        - CLICKHOUSE_DB
+        - CLICKHOUSE_USER
+        - CLICKHOUSE_PASSWORD
   - service:
-      compose_file_path: auth-service/docker-compose.yaml # auth-service
-      req_env_vars:
-        - POSTGRES_USER
-        - POSTGRES_PASSWORD
-        - POSTGRES_DB
-        - POSTGRES_HOST
-        - POSTGRES_PORT
-        - OLTP_ENDPOINT
-      custom_build:
-        command:
-          dir: ./
-          args: ["docker", "build", "-t", "auth-service", "-f", "./auth-service/Dockerfile", "."]
+      compose_file_path: infra/kafka/kafka.docker-compose.yml # kafka
+      start_cooldown: 5
+  - basic_command: # postgres migrations
+      command:
+        dir: infra/postgres/migrations
+        args: ["goose", "postgres", "user=${POSTGRES_USER} host=${POSTGRES_HOST_FROM_HOST} port=${POSTGRES_PORT_FROM_HOST} password=${POSTGRES_PASSWORD} sslmode=disable dbname=${POSTGRES_DB}", "up"]
+        req_env_vars:
+          - POSTGRES_DB
+          - POSTGRES_USER
+          - POSTGRES_PASSWORD
+          - POSTGRES_HOST_FROM_HOST
+          - POSTGRES_PORT_FROM_HOST
+  - basic_command: # clickhouse migrations
+      command:
+        dir: infra/clickhouse/migrations
+        args: ["goose", "clickhouse", "tcp://${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}@${CLICKHOUSE_HOST_FROM_HOST}:${CLICKHOUSE_PORT_FROM_HOST}/${CLICKHOUSE_DB}", "up"]
+        req_env_vars:
+          - CLICKHOUSE_DB
+          - CLICKHOUSE_USER
+          - CLICKHOUSE_PASSWORD
+          - CLICKHOUSE_HOST_FROM_HOST
+          - CLICKHOUSE_PORT_FROM_HOST

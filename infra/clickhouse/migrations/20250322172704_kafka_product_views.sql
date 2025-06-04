@@ -1,6 +1,6 @@
 -- +goose Up
--- +goose StatementBegin
 
+-- +goose StatementBegin
 CREATE OR REPLACE TABLE kafka_product_views
 (
     user_id UUID,
@@ -12,16 +12,20 @@ SETTINGS kafka_broker_list = 'host.docker.internal:9094',
          kafka_topic_list = 'product_views',
          kafka_group_name = 'clickhouse_group',
          kafka_format = 'JSONEachRow',
-		 date_time_input_format='best_effort';
+		 date_time_input_format='best_effort'
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS product_views (
 	user_id UUID,
 	product_id UUID,
 	timestamp DateTime
 )
 ENGINE = MergeTree
-ORDER BY timestamp;
+ORDER BY timestamp
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 CREATE MATERIALIZED VIEW IF NOT EXISTS product_views_mv TO product_views
 AS
 	SELECT
@@ -29,12 +33,15 @@ AS
 		product_id,
 		timestamp
 FROM kafka_product_views;
-
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 DROP TABLE IF EXISTS product_views;
+-- +goose StatementEnd
+-- +goose StatementBegin
 DROP TABLE IF EXISTS kafka_product_views;
+-- +goose StatementEnd
+-- +goose StatementBegin
 DROP VIEW IF EXISTS product_views_mv;
 -- +goose StatementEnd

@@ -17,7 +17,7 @@ tasks:
         - CLICKHOUSE_PASSWORD
   - service:
       compose_file_path: infra/monitoring/docker-compose.yml # monitoring
-  - basic_command: # migrations
+  - basic_command: # postgres migrations
       command:
         dir: infra/postgres/migrations
         args: ["goose", "postgres", "user=${POSTGRES_USER} host=${POSTGRES_HOST_FROM_HOST} port=${POSTGRES_PORT_FROM_HOST} password=${POSTGRES_PASSWORD} sslmode=disable dbname=${POSTGRES_DB}", "up"]
@@ -27,6 +27,16 @@ tasks:
           - POSTGRES_PASSWORD
           - POSTGRES_HOST_FROM_HOST
           - POSTGRES_PORT_FROM_HOST
+  - basic_command: # clickhouse migrations
+      command:
+        dir: infra/clickhouse/migrations
+        args: ["goose", "clickhouse", "tcp://${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}@${CLICKHOUSE_HOST_FROM_HOST}:${CLICKHOUSE_PORT_FROM_HOST}/${CLICKHOUSE_DB}", "up"]
+        req_env_vars:
+          - CLICKHOUSE_DB
+          - CLICKHOUSE_USER
+          - CLICKHOUSE_PASSWORD
+          - CLICHKOUSE_HOST_FROM_HOST
+          - CLICKHOUSE_PORT_FROM_HOST
   - service:
       compose_file_path: product-service/docker-compose.yaml # product-service
       custom_build:
